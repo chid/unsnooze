@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.19.3 — 2026-09-30
+
+Codex fixes from a single herdr report: stops that were missed, woken late,
+or woken in the wrong place.
+
+- The out-of-credits screen on Plus plans no longer hides a usage limit. Its
+  Upgrade / Add Credits picker pushed the banner off the part of the pane
+  unsnooze reads; the "Your rate limit resets on" line is now recognised
+  instead (#36).
+- A reset time that a narrow pane wraps onto the next row is read correctly,
+  instead of falling back to guessing and probing (#33).
+- A Codex stop is only marked resumed once its session log shows new output.
+  A keypress or tab switch that briefly hides the banner no longer drops the
+  stop and its exact reset time. Stops with no session log keep the old
+  behaviour (#34).
+- A session running in herdr (or any non-default multiplexer) keeps its pane
+  address when a second detection of the same stop comes in, so it is woken
+  in its own pane instead of reopened beside it (#35).
+
 ## 1.19.2 — 2026-09-27
 
 Setup on Windows no longer creates a Scheduled Task. That task is what
