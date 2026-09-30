@@ -18,23 +18,33 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const AGY_DIR = () => process.env.UNSNOOZE_AGY_DIR || join(homedir(), '.gemini', 'antigravity-cli');
+const SESSION_RECENCY_MS = 5 * 60 * 60 * 1000;
 
 const LIMIT_ANCHORS = [
+  /Individual quota reached/i,
   /Model quota limit exceeded/i,
   /RESOURCE_EXHAUSTED/,
   /quota (?:limit )?exceeded/i,
 ];
 
 export const patterns = {
+  bannerWraps: true,
   limitPatterns: LIMIT_ANCHORS,
   // "Refreshes in 6 days and 18 hours" renders near the quota banner; anchors
   // double as reset lines for the API-key single-line renders.
   resetPatterns: [
-    /Refreshes in/i,
+    /Refreshes\s+in/i,
+    /Resets\s+in/i,
+    /\b(?:Resets|Refreshes)(?:\s+in)?\s*$/i,
     ...LIMIT_ANCHORS,
   ],
-  weeklyPatterns: [/Refreshes in \d+ days?/i],   // multi-day refresh = the weekly cap
-  fiveHourPatterns: [],
+  weeklyPatterns: [
+    /Refreshes\s+in\s+\d+\s+days?/i,
+    /(?:Refreshes|Resets)\s+in\s+\d+(?:\.\d+)?\s*(?:days?|d)(?![a-z])/i,
+  ],
+  fiveHourPatterns: [
+    /(?:Refreshes|Resets)\s+in\s+\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])/i,
+  ],
   busyPatterns: [
     /esc to interrupt/i,
     /attempt \d+\/\d+/i,
@@ -47,9 +57,10 @@ export const patterns = {
 
 // ~/.gemini/antigravity-cli/history.jsonl indexes all conversations. Schema is
 // undocumented (and a SQLite migration is rumored) — parse the tail
-// tolerantly: an entry counts if any string value equals the cwd, its id is
-// the first conversation-ish field. Null on any doubt (the resumer then opens
-// a fresh agy session; the wake message explains the context loss).
+// tolerantly. A workspace can have multiple live conversations, so when the
+// caller supplies a detection time, use an id only if exactly one conversation
+// appears in recent history. Otherwise the live pane can still be resumed in
+// place; if it has disappeared, the adapter falls back to --continue.
 function tailBytes(path, bytes = 64 * 1024) {
   let fd;
   try {
@@ -70,13 +81,49 @@ export function latestSessionId(cwd, aroundTs = null, agyDir = AGY_DIR()) {
   const text = tailBytes(join(agyDir, 'history.jsonl'));
   if (!text) return null;
   const lines = text.split('\n').filter(l => l.trim());
+  const recentIds = new Set();
+  let latestId = null;
+  let hasTimestamp = false;
   for (let i = lines.length - 1; i >= 0; i--) {
     let entry;
     try { entry = JSON.parse(lines[i]); } catch { continue; }
     if (!entry || typeof entry !== 'object') continue;
     if (!Object.values(entry).some(v => v === cwd)) continue;
     const id = entry.conversation_id ?? entry.conversationId ?? entry.id;
-    if (typeof id === 'string' && id) return id;
+    if (typeof id !== 'string' || !id) continue;
+    latestId ||= id;
+    const timestamp = typeof entry.timestamp === 'number'
+      ? entry.timestamp
+      : typeof entry.timestamp === 'string' ? Date.parse(entry.timestamp) : NaN;
+    if (Number.isFinite(timestamp)) {
+      hasTimestamp = true;
+      if (Number.isFinite(aroundTs) && Math.abs(aroundTs - timestamp) <= SESSION_RECENCY_MS) {
+        recentIds.add(id);
+      }
+    }
+  }
+  if (!Number.isFinite(aroundTs) || !hasTimestamp) return latestId;
+  return recentIds.size === 1 ? recentIds.values().next().value : null;
+}
+
+export function latestBannerAt(cwd, aroundTs = null, agyDir = AGY_DIR()) {
+  const text = tailBytes(join(agyDir, 'history.jsonl'));
+  if (!text) return null;
+  const lines = text.split('\n').filter(l => l.trim());
+  for (let i = lines.length - 1; i >= 0; i--) {
+    let entry;
+    try { entry = JSON.parse(lines[i]); } catch { continue; }
+    if (!entry || typeof entry !== 'object') continue;
+    if (!Object.values(entry).some(v => v === cwd)) continue;
+    const timestamp = typeof entry.timestamp === 'number'
+      ? entry.timestamp
+      : typeof entry.timestamp === 'string' ? Date.parse(entry.timestamp) : NaN;
+    if (Number.isFinite(timestamp)) {
+      if (!Number.isFinite(aroundTs)) return timestamp;
+      if (timestamp <= (aroundTs + 5000) && (aroundTs - timestamp) <= SESSION_RECENCY_MS) {
+        return timestamp;
+      }
+    }
   }
   return null;
 }
@@ -96,6 +143,7 @@ export default {
   // v1: every agent launches the bare TUI and gets the prompt typed once idle.
   launchArgs(message) { return { args: [], messageViaPane: true }; },
   latestSessionId,
+  latestBannerAt,
   isForegroundCommand(cmd) {
     return cmd === 'agy' || cmd === 'node' || cmd === 'unsnooze';
   },
