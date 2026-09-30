@@ -106,7 +106,10 @@ test('the revive output is captured where a user can actually read it', async ()
   // muxSession: headless deliberately has no sessionExists(), so reviveTarget()
   // cannot confirm the old session and falls through to RESUME_SESSION_NAME.
   const log = join(logDir, `${RESUME_SESSION_NAME}.log`);
-  for (let i = 0; i < 40 && !existsSync(log); i++) {
+  // The file appears before the child writes to it, so wait for the content,
+  // not just the file (a slow CI runner read it empty in between).
+  const started = () => existsSync(log) && /agent started/.test(readFileSync(log, 'utf-8'));
+  for (let i = 0; i < 100 && !started(); i++) {
     await new Promise(r => setTimeout(r, 50));
   }
   assert.ok(existsSync(log), `expected a log at ${log}`);
