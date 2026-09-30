@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.19.4 — 2026-09-30
+
+Antigravity's new quota banner, and a shorter README.
+
+### Antigravity (`agy`)
+
+- The current `Individual quota reached … Resets in 2h52m46s` banner is now
+  detected, including short countdowns (`45m10s`, `30s`) and multi-day ones
+  (`6d18h`, the weekly cap). A banner a narrow pane wrapped onto two rows is
+  read whole (#38).
+- The countdown is dated from the prompt that hit the limit, not from when
+  unsnooze noticed the banner, so a late scrape no longer pushes the wake late.
+- When a folder has more than one recent Antigravity conversation, unsnooze no
+  longer guesses which one stopped. It wakes the live pane, and uses
+  `--continue` if that pane is gone.
+
+### Docs
+
+- The README is now a short overview. Per-agent details, herdr and Windows
+  notes, and the FAQ moved to the website, including a new
+  [Supported agents](https://unsnooze.dev/docs/agents/) page (#39).
+
 ## 1.19.3 — 2026-09-30
 
 Codex fixes from a single herdr report: stops that were missed, woken late,
