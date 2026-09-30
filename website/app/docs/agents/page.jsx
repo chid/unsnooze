@@ -89,11 +89,15 @@ export default function AgentsDocsPage() {
                 passthroughs are detected too; <C>insufficient credits</C> (402) only notifies.</p>
 
               <h3>Antigravity CLI (Google, <C>agy</C>) <em>— experimental</em></h3>
-              <p>The Gemini CLI successor. Scrapes the quota strings (<C>Model quota limit
-                exceeded</C>, <C>Refreshes in 6 days and 18 hours</C> — a multi-day refresh is the
-                weekly cap) and treats <C>503 MODEL_CAPACITY_EXHAUSTED</C> as a transient overload,
+              <p>The Gemini CLI successor. Scrapes the quota strings (<C>Individual quota
+                reached … Resets in 2h52m46s</C>, <C>Model quota limit exceeded</C>,{' '}
+                <C>Refreshes in 6 days and 18 hours</C> — a multi-day reset is the weekly cap,
+                anything shorter the 5-hour window), rejoins a banner a narrow pane wrapped, and
+                dates the countdown from the prompt that failed. It treats <C>503 MODEL_CAPACITY_EXHAUSTED</C> as a transient overload,
                 not a limit. Dead sessions revive via <C>agy --conversation=&lt;id&gt;</C>, with ids
-                from <C>~/.gemini/antigravity-cli/history.jsonl</C>.</p>
+                from <C>~/.gemini/antigravity-cli/history.jsonl</C>. When a folder has more than
+                one recent conversation, unsnooze does not guess: it wakes the live pane, and
+                falls back to <C>--continue</C> if that pane is gone.</p>
 
               <h3>Cursor CLI (<C>cursor-agent</C>) <em>— experimental</em></h3>
               <p>The only agent whose limit is <strong>not waitable</strong>: Cursor's included
